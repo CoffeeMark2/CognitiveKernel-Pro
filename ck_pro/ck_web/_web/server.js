@@ -147,7 +147,7 @@ app.post('/getBrowser', async (req, res) => {
     let browserEntry = browserPool[availableBrowserslot];
     if (!browserEntry.browser) {
       chromium.use(StealthPlugin())
-      const new_browser = await chromium.launch({headless: true, chromiumSandbox: true});
+      const new_browser = await chromium.launch({headless: true, chromiumSandbox: false});
       browserEntry.browser = await new_browser.newContext({
         viewport: {width: 1024, height: 768},
         locale: 'en-US',  // Set the locale to English (US)

@@ -17,9 +17,9 @@ from .gaia_scorer import question_scorer
 
 
 default_main_configs = {
-    "model": {"call_target": "gpt:gpt-4o-mini"},  # LLM target
+    "model": {"call_target": "gpt:gpt-4o-2024-11-20"},  # LLM target
     "web_agent": {
-        "model": {"call_target": "gpt:gpt-4o-mini"},  # LLM target for the web agent
+        "model": {"call_target": "gpt:gpt-4o-2024-11-20"},  # LLM target for the web agent
         "web_env_kwargs": {"web_ip": "localhost:3000"},  # IP for the web-browser server
     }
 }

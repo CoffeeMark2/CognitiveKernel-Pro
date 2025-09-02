@@ -1,3 +1,9 @@
+*.err
+*.log
+run.sh
+*.zip
+ck_pro/ck_web/_web/screenshots
+
 __pycache__/
 # Distribution / packaging
 .Python

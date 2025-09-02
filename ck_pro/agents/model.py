@@ -311,11 +311,9 @@ class LLM(KwargsInitializable):
             rprint(self.show_messages_str(messages, _call_kwargs, self.print_call_in))  # print it out
         # --
         if _call_target_type == "manual":
-            user_input = input("Put your input >> ")
-            response = user_input.strip()
-            ret = response
+            ret = self._call_openai_chat(messages, **_call_kwargs)
         elif _call_target_type == "fake":
-            ret = "You are correct! As long as you are happy!"
+            ret = self._call_openai_chat(messages, **_call_kwargs)
         elif _call_target_type == "gpt":
             ret = self._call_openai_chat(messages, **_call_kwargs)
         elif _call_target_type == "claude":
