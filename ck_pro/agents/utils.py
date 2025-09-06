@@ -12,6 +12,9 @@ from typing import Union, Callable
 from functools import partial
 import signal
 import numpy as np
+import traceback
+import subprocess
+
 
 from rich.console import Console as rich_console
 from rich import print as rich_print
@@ -79,7 +82,12 @@ def wrapped_trying(func, default_return=None, max_times=10, wait_error_names=(),
             ret = func()
             break  # remember to jump out!!!
         except Exception as e:
-            rprint(f"Retry with Error: {e}", style="white on red")
+            detailed_error_info = traceback.format_exc()
+        
+            # 打印格式化后的详细错误
+            rprint(f"[white on red]Retry with Error:[/white on red]")
+            rprint(f"[red]{detailed_error_info}[/red]")
+
             rand = random.randint(1, 5)
             time.sleep(rand)
             if type(e).__name__ in wait_error_names:
@@ -327,11 +335,48 @@ class CodeExecutor:
                 signal.alarm(0)  # Disable the alarm
             # simply remove global vars to avoid pickle errors for multiprocessing running!
             # self.globals.clear()  # note: simply create a new executor for each run!
+    # def _exec(self, code, null_stdin, timeout):
+    #     # 注意：这个新实现忽略了 null_stdin 和 self.globals 的复杂交互
+    #     # 这是一个简化版的思路，实际应用可能需要通过文件或 stdin/stdout 来传递状态
+        
+    #     # 1. 将要执行的代码写入一个临时脚本文件
+    #     temp_script_path = "temp_agent_script.py"
+    #     with open(temp_script_path, 'w', encoding='utf-8') as f:
+    #         f.write(code)
 
+    #     try:
+    #         # 2. 使用 subprocess.run 来执行这个脚本，并设置超时
+    #         result = subprocess.run(
+    #             [sys.executable, temp_script_path], # sys.executable 保证使用当前Python解释器
+    #             capture_output=True,
+    #             text=True,
+    #             timeout=timeout if timeout > 0 else None
+    #         )
+
+    #         # 3. 将子进程的输出打印出来，模拟原来的 custom_print
+    #         if result.stdout:
+    #             self.custom_print(f"Code STDOUT:\n{result.stdout}")
+    #         if result.stderr:
+    #             self.custom_print(f"Code STDERR:\n{result.stderr}") # 将错误也作为输出
+            
+    #         # 检查代码是否执行成功
+    #         if result.returncode != 0:
+    #             # 如果有错误，可以模拟抛出一个异常
+    #             raise RuntimeError(f"Code execution failed with return code {result.returncode}:\n{result.stderr}")
+
+    #     except subprocess.TimeoutExpired:
+    #         # 捕获超时异常
+    #         raise TimeoutError(f"Code execution timed out after {timeout} seconds.")
+        
+    #     finally:
+    #         # 4. 清理临时文件
+    #         if os.path.exists(temp_script_path):
+    #             os.remove(temp_script_path)
     def run(self, code, catch_exception=True, null_stdin=None, timeout=0):
         if null_stdin is None:
             null_stdin = self.null_stdin  # use the default one
         # --
+        timeout = 0 # <--- ADD THIS LINE
         if code:  # some simple modifications
             code_nopes = []
             code_lines = [f"import {lib}\n" for lib in ["os", "sys"]] + ["", ""]

@@ -8,7 +8,7 @@ from .agent import FileAgent
 from ..agents.utils import rprint, my_open_with, zwarn, incr_update_dict, get_until_hit, my_json_dumps
 
 default_file_configs = {
-    "model": {"call_target": "gpt:gpt-4o-mini"},  # LLM target
+    "model": {"call_target": "gpt:claude-sonnet-4-20250514"},  # LLM target
     # "web_env_kwargs": {"web_ip": "localhost:3000"},  # IP for the web-browser server
 }
 

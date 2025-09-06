@@ -2,7 +2,10 @@
 *.log
 run.sh
 *.zip
-ck_pro/ck_web/_web/screenshots
+ck_pro/ck_web/_web/
+result/
+gaia/
+
 
 __pycache__/
 # Distribution / packaging

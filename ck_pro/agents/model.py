@@ -232,7 +232,7 @@ class Boto3Helper:
 class LLM(KwargsInitializable):
     def __init__(self, **kwargs):
         # basics
-        self.call_target = "manual"  # fake=fake, manual=input, gpt(gpt:model_name)=openai [such as gpt:gpt-4o-mini], request(http...)=request
+        self.call_target = "gpt:chatgpt-4o-latest"  # fake=fake, manual=input, gpt(gpt:model_name)=openai [such as gpt:gpt-4o-mini], request(http...)=request
         self.thinking = False
         self.print_call_in = "white on blue"  # easier to read
         self.print_call_out = "white on green"  # easier to read
@@ -311,9 +311,9 @@ class LLM(KwargsInitializable):
             rprint(self.show_messages_str(messages, _call_kwargs, self.print_call_in))  # print it out
         # --
         if _call_target_type == "manual":
-            ret = self._call_openai_chat(messages, **_call_kwargs)
+            raise NotImplementedError("manual input not supported in this version!")
         elif _call_target_type == "fake":
-            ret = self._call_openai_chat(messages, **_call_kwargs)
+            ret = "Fake LLM response."
         elif _call_target_type == "gpt":
             ret = self._call_openai_chat(messages, **_call_kwargs)
         elif _call_target_type == "claude":

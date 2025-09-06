@@ -84,7 +84,7 @@ class MultiStepAgent(KwargsInitializable):
         self.tools: List[Tool] = []  # tools
         self.model = LLM(_default_init=True)  # main loop's model
         self.templates = {}  # template names: plan/action/end
-        self.max_steps = 10  # maximum steps
+        self.max_steps = 8  # maximum steps
         self.max_time_limit = 0  # early stop if exceeding this time (in seconds)
         self.recent_steps = 5  # feed recent steps
         self.store_io = True  # whether store the inputs/outputs of the model in session

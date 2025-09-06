@@ -95,6 +95,35 @@ def file_agent(task: str, file_path_dict: dict = None) -> dict:
             _kwargs["starting_file_path_dict"] = session.info["file_path_dict"]
         self.file_envs[_id] = FileEnv(**_kwargs)
         self.current_session = session
+    # def init_run(self, session):
+    #     super().init_run(session)
+    #     _id = session.id
+    #     assert _id not in self.file_envs
+    #     _kwargs = self.file_env_kwargs.copy()
+        
+    #     file_path_dict = session.info.get("file_path_dict") # Get the dictionary of files
+    #     if file_path_dict:
+    #         _kwargs["starting_file_path_dict"] = file_path_dict
+
+    #     # Create the workspace (FileEnv)
+    #     file_env = FileEnv(**_kwargs)
+    #     self.file_envs[_id] = file_env
+    #     self.current_session = session
+
+    #     # --- THIS IS THE NEW PART ---
+    #     # Check if there are any files to work with
+    #     if file_path_dict:
+    #         # Get the path of the first file. 
+    #         # We convert the dict_keys to a list to access the first element.
+
+    #         first_file_path = list(file_path_dict.keys())[0]
+            
+    #         # Construct the command string, just like the LLM would
+    #         action_command = f"load_file('{first_file_path}')"
+            
+    #         # Tell the environment to execute this command immediately
+    #         print(f"[xkf]FileAgent: Proactively loading first file: {first_file_path}") # Good for debugging!
+    #         file_env.step_state(action_command)
 
     def end_run(self, session):
         ret = super().end_run(session)
