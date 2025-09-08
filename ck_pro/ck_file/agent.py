@@ -1,6 +1,7 @@
 #
 
 import json
+import time
 from ..agents.agent import MultiStepAgent, register_template, ActionResult
 from ..agents.utils import zwarn, GET_ENV_VAR, have_images_in_messages
 from ..agents.model import LLM
@@ -180,8 +181,38 @@ def file_agent(task: str, file_path_dict: dict = None) -> dict:
         _use_multimodal = session.info.get("use_multimodal", False) or have_images_in_messages(messages)
         if model is None:
             model = self.model_multimodal if _use_multimodal else self.model  # use which model?
+        
+        # Get initial call statistics
+        initial_stat = model.get_call_stat()
+        
+        # Record start time
+        start_time = time.perf_counter()
+        
+        # Call the model
         response = model(messages)
-        return response
+        
+        # Calculate time taken
+        time_taken = time.perf_counter() - start_time
+        
+        # Get updated call statistics
+        final_stat = model.get_call_stat()
+        
+        # Calculate token usage for this call
+        token_usage = {}
+        for key in ['llm_call', 'completion_tokens', 'prompt_tokens', 'total_tokens']:
+            token_usage[key] = final_stat.get(key, 0) - initial_stat.get(key, 0)
+        
+        # Print statistics if enabled
+        if hasattr(self, 'enable_token_time_stats') and self.enable_token_time_stats:
+            rprint(f"FileAgent step call statistics - Time: {time_taken:.3f}s, Tokens: {token_usage}", style="white on blue")
+        
+        # Return both response and token usage information
+        return response, {
+            "time_taken": time_taken,
+            "token_usage": token_usage,
+            "initial_stat": initial_stat,
+            "final_stat": final_stat
+        }
 
     # --
     # other helpers

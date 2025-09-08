@@ -16,7 +16,7 @@ from .model import LLM
 from .session import AgentSession
 from .tool import Tool
 from .utils import KwargsInitializable, rprint, TemplatedString, parse_response, CodeExecutor, zwarn
-
+from .utils import chat_with_llm
 TEMPLATES = {}
 
 def register_template(templates):
@@ -28,6 +28,32 @@ def register_template(templates):
 
 def get_template(key: str):
     return TemplatedString(TEMPLATES.get(key))
+
+# Register template for assigner model selection
+register_template({
+    "assigner_model_selection": """
+Task: {task}
+
+Model Options:
+{model_options}
+
+Recent Steps:
+{recent_steps_str}
+
+Current Step:
+{current_step_str}
+
+Based on the task complexity, recent steps, and available models, which model would be most appropriate? Consider:
+1. Simple tasks (basic queries, straightforward reasoning) should use low-cost models
+2. Complex tasks (multi-step reasoning, creative tasks, technical analysis) should use high-capability models
+3. Tasks with errors or requiring high accuracy should use high-capability models
+
+Respond with ONLY the model name from the list above.
+"""
+})
+
+
+
 
 # --
 # storage of the results for an agent call
@@ -83,6 +109,8 @@ class MultiStepAgent(KwargsInitializable):
         self.sub_agent_names = []  # sub-agent names (able to be found using getattr!)
         self.tools: List[Tool] = []  # tools
         self.model = LLM(_default_init=True)  # main loop's model
+        self.assigner_model = None  # assigner model for model selection
+        self.model_list = []  # list of available models for selection
         self.templates = {}  # template names: plan/action/end
         self.max_steps = 8  # maximum steps
         self.max_time_limit = 0  # early stop if exceeding this time (in seconds)
@@ -101,6 +129,15 @@ class MultiStepAgent(KwargsInitializable):
         assert len(ALL_FUNCTIONS) == len(self.sub_agents + self.tools), "There may be repeated function names of sub-agents and tools."
         self.ACTIVE_FUNCTIONS = {k: ALL_FUNCTIONS[k] for k in self.active_functions}
         self.final_result = None  # to store final result
+        # Initialize assigner model and model list if not provided
+        if self.assigner_model is None:
+            self.assigner_model = LLM(_default_init=True, call_target="gpt:gpt-4o-mini-2024-07-18")
+        if not self.model_list:
+            self.model_list = [
+                {"name": "gpt:gpt-4o-mini-2024-07-18", "cost": "low", "capability": "basic"},
+                {"name": "gpt:gpt-4o-2024-05-13", "cost": "high", "capability": "advanced"},
+                {"name": "gpt:claude-sonnet-4-20250514", "cost": "high", "capability": "advanced"}
+            ]
         # --
 
     @property
@@ -190,11 +227,15 @@ class MultiStepAgent(KwargsInitializable):
     def step(self, session, state):
         _input_kwargs, _extra_kwargs = self.step_prepare(session, state)
         _current_step = session.get_current_step()
+        
+        # Select model for this step using assigner
+        selected_model = self.select_model_for_step(session, state)
+        
         # planning
         has_plan_template = "plan" in self.templates
         if has_plan_template:  # planning to update state
             plan_messages = self.templates["plan"].format(**_input_kwargs)
-            plan_response = self.step_call(messages=plan_messages, session=session)
+            plan_response, plan_stats = self.step_call(messages=plan_messages, session=session, model=selected_model)
             plan_res = self._parse_output(plan_response)
             # state update
             if plan_res["code"]:
@@ -221,12 +262,14 @@ class MultiStepAgent(KwargsInitializable):
             plan_res["state"] = state.copy()  # after updating the progress state (make a copy)
             if self.store_io:  # further storage
                 plan_res.update({"llm_input": plan_messages, "llm_output": plan_response})
+            # Add token usage statistics to the step
+            _current_step["plan_stats"] = plan_stats
             yield {"type": "plan", "step_info": _current_step}
         # predict action
         _action_input_kwargs = _input_kwargs.copy()
         _action_input_kwargs["state"] = json.dumps(state, ensure_ascii=False, indent=2)  # there can be state updates
         action_messages = self.templates["action"].format(**_action_input_kwargs)
-        action_response = self.step_call(messages=action_messages, session=session)
+        action_response, action_stats = self.step_call(messages=action_messages, session=session, model=selected_model)
         action_res = self._parse_output(action_response)
         # perform action
         step_res = self.step_action(action_res, _action_input_kwargs, **_extra_kwargs)
@@ -235,6 +278,8 @@ class MultiStepAgent(KwargsInitializable):
         action_res["observation"] = step_res  # after executing the step
         if self.store_io:  # further storage
             action_res.update({"llm_input": action_messages, "llm_output": action_response})
+        # Add token usage statistics to the step
+        _current_step["action_stats"] = action_stats
         yield {"type": "action", "step_info": _current_step}
         # --
 
@@ -242,6 +287,8 @@ class MultiStepAgent(KwargsInitializable):
         has_end_template = "end" in self.templates
         has_final_result = self.has_final_result()
         final_results = self.get_final_result() if has_final_result else None
+        # no need to execute anything and simply prepare final outputs
+        _current_step = session.get_current_step()
         if has_end_template:  # we have an ending module to further specify final results
             _input_kwargs, _extra_kwargs = self.step_prepare(session, state)
             # --
@@ -253,15 +300,19 @@ class MultiStepAgent(KwargsInitializable):
             if final_results:
                 stop_reason = f"{stop_reason} (with the result of {final_results})"
             _input_kwargs["stop_reason"] = stop_reason
+            
+            # Select model for this step using assigner
+            selected_model = self.select_model_for_step(session, state)
+            
             end_messages = self.templates["end"].format(**_input_kwargs)
-            end_response = self.step_call(messages=end_messages, session=session)
+            end_response, end_stats = self.step_call(messages=end_messages, session=session, model=selected_model)
             end_res = self._parse_output(end_response)
             if self.store_io:  # further storage
                 end_res.update({"llm_input": end_messages, "llm_output": end_response})
+            # Add token usage statistics to the step
+            _current_step["end_stats"] = end_stats
         else:  # no end module
             end_res = {}
-        # no need to execute anything and simply prepare final outputs
-        _current_step = session.get_current_step()
         if has_end_template or final_results is None:  # try to get final results, end_module can override final_results
             try:
                 final_results = eval(end_res["code"])
@@ -336,6 +387,43 @@ class MultiStepAgent(KwargsInitializable):
         if clear:
             self.final_result = None
         return ret
+    
+    # --
+    # Model selection method
+    def select_model_for_step(self, session, state):
+        # Prepare input for assigner model
+        _input_kwargs = self._prepare_common_input_kwargs(session, state)
+        
+        # Format model options
+        model_options = "\n".join([f"- {model['name']} (cost: {model['cost']}, capability: {model['capability']})" for model in self.model_list])
+        _input_kwargs["model_options"] = model_options
+        
+        # Get assigner template
+        assigner_template = get_template("assigner_model_selection")
+        assigner_messages = assigner_template.format(**_input_kwargs)
+        
+        # Call assigner model
+        rprint(f"Model Assigner Input:\n{assigner_messages}", style="white on magenta")
+        system_prompt = "You are an expert at selecting the most appropriate language model for a given task. Your goal is to balance cost and capability."
+
+        assigner_response = chat_with_llm(system_prompt=system_prompt,
+                                              user_prompt=assigner_messages,
+                                              model="claude-sonnet-4-20250514", 
+                                              )
+        # Parse response to get model name
+        selected_model_name = assigner_response.strip()
+        
+        rprint("successfully get response from assigner model, select model: "+selected_model_name,style="white on magenta")
+        # Find the selected model in the model list
+        for model_info in self.model_list:
+            if model_info["name"] == selected_model_name:
+                # Create new LLM instance with selected model
+                selected_model = LLM(_default_init=True, call_target=selected_model_name)
+                return selected_model
+        
+        # If model not found, return default model
+        return self.model
+    
     # --
 
     # --
@@ -349,9 +437,40 @@ class MultiStepAgent(KwargsInitializable):
 
     def step_call(self, messages, session, model=None):
         if model is None:
-            model = self.model
+            # Use assigner to select the most appropriate model for this step
+            model = self.model  # 使用默认模型，因为我们没有直接访问state
+        
+        # Get initial call statistics
+        initial_stat = model.get_call_stat()
+        
+        # Record start time
+        start_time = time.perf_counter()
+        
+        # Call the model
         response = model(messages)
-        return response
+        
+        # Calculate time taken
+        time_taken = time.perf_counter() - start_time
+        
+        # Get updated call statistics
+        final_stat = model.get_call_stat()
+        
+        # Calculate token usage for this call
+        token_usage = {}
+        for key in ['llm_call', 'completion_tokens', 'prompt_tokens', 'total_tokens']:
+            token_usage[key] = final_stat.get(key, 0) - initial_stat.get(key, 0)
+        
+        # Print statistics if enabled
+        if hasattr(self, 'enable_token_time_stats') and self.enable_token_time_stats:
+            rprint(f"Step call statistics - Time: {time_taken:.3f}s, Tokens: {token_usage}", style="white on blue")
+        
+        # Return both response and token usage information
+        return response, {
+            "time_taken": time_taken,
+            "token_usage": token_usage,
+            "initial_stat": initial_stat,
+            "final_stat": final_stat
+        }
 
     def step_prepare(self, session, state):
         _input_kwargs = self._prepare_common_input_kwargs(session, state)

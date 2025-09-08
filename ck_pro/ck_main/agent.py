@@ -46,6 +46,8 @@ class CKAgent(MultiStepAgent):
         self.step_mrun = 1  # step-level multiple run to do ensemble
         self.mrun_pool_size = 5  # max pool size for parallel running
         self.mrun_multimodal_count = 0  # how many runs to go with multimodal-web
+        # statistics tracking
+        self.enable_token_time_stats = kwargs.get("enable_token_time_stats", True)
         # --
         register_template(CK_PROMPTS)  # add web prompts
         super().__init__(**feed_kwargs)
@@ -91,7 +93,7 @@ class CKAgent(MultiStepAgent):
                 _aggr_inputs["current_step"] = f"Thought: {action_res.get('thought')}\nAction: ```\n{action_res.get('code')}```"
                 _aggr_inputs["result_list"] = "\n".join([f"### Result {ii}\n{rr}\n" for ii, rr in enumerate(all_results)])
                 aggr_messages = self.templates["aggr"].format(**_aggr_inputs)
-                aggr_response = self.step_call(messages=aggr_messages, session=None)  # note: for simplicity no need session info here for aggr!
+                aggr_response, aggr_stats = self.step_call(messages=aggr_messages, session=None)  # note: for simplicity no need session info here for aggr!
                 aggr_res = self._parse_output(aggr_response)
                 if self.store_io:  # further storage
                     aggr_res.update({"llm_input": aggr_messages, "llm_output": aggr_response})

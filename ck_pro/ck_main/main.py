@@ -150,12 +150,17 @@ def process_task(inst, ck_agent, ck_evaluator, args, input_dir):
         if res_session is None:
             inst["session"] = {"steps": [{"step_idx": -1, "end": {"final_results": {"output": "error", "log": "error"}}}]}
         else:
-            res_session.info["call_stat"] = ck_agent.get_call_stat(clear=True)
+            call_stat = ck_agent.get_call_stat(clear=True)
+            res_session.info["call_stat"] = call_stat
             end_pc, end_time = time.perf_counter(), time.ctime()
-            res_session.info.update({"start_time": start_time, "end_time": end_time, "duration": end_pc - start_pc})
+            duration = end_pc - start_pc
+            res_session.info.update({"start_time": start_time, "end_time": end_time, "duration": duration})
             inst["session"] = res_session.to_dict()
             if args.save_failed_tries and len(res_session_list) > 1:
                 inst['previous_failed_sessions'] = [sess.to_dict() for sess in res_session_list[:-1]]
+            
+            # Print overall statistics for this task
+            rprint(f"Task {inst['id']} finished - Duration: {duration:.3f}s, Call stats: {call_stat}", style="white on green")
 
         # Simple EVAL
         answer_gold = str(inst.get("answer", "UNK"))
@@ -192,6 +197,8 @@ def main():
         incr_update_dict(configs, src_dict)
         rprint(f"Update configs with {src_dict}")
     
+    # Enable token and time statistics
+    configs["enable_token_time_stats"] = True
     ck_agent = CKAgent(**configs)
     if args.sampling_mode or args.inference_time_evaluation_method != "disabled":
         ck_evaluator = Evaluator()

@@ -15,10 +15,72 @@ import numpy as np
 import traceback
 import subprocess
 
-
+from openai import OpenAI, APIError, RateLimitError, APIConnectionError
 from rich.console import Console as rich_console
 from rich import print as rich_print
 from rich.markup import escape as rich_escape
+
+
+def chat_with_llm(user_prompt: str,
+                  system_prompt: str = "You are a helpful assistant.",
+                  model: str = "gpt-4o-mini-2024-07-18") -> str:
+    """
+    Communicates with a specified Large Language Model (LLM) with error handling.
+
+    Args:
+        user_prompt (str): The user's input message.
+        system_prompt (str, optional): The system prompt to set the assistant's behavior. 
+                                       Defaults to "You are a helpful assistant.".
+        model (str, optional): The model to use for the chat completion. 
+                               Defaults to "gpt-4o-mini-2024-07-18".
+
+    Returns:
+        str: The LLM's response message, or a descriptive error message 
+             starting with "Error:" if an error occurs.
+    """
+    try:
+        # 1. Get API Key from environment variables
+        #    Please ensure you have set an environment variable named OPENAI_API_KEY
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return "Error: OPENAI_API_KEY environment variable not found. Please make sure it is set correctly."
+
+        # 2. Initialize the OpenAI client
+        #    - api_key: Set your API key.
+        #    - base_url: The compatible API endpoint for the Aliyun Bailian service.
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+
+        # 3. Create a chat completion request
+        #    - model: Specify the model to use.
+        #    - messages: A list of messages comprising the conversation history.
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        
+        # 4. Extract and return the model's response content
+        #    A successful API response will contain a 'choices' list.
+        if completion.choices and completion.choices[0].message and completion.choices[0].message.content:
+            return completion.choices[0].message.content.strip()
+        else:
+            return "Error: API returned an empty response. Could not get an answer."
+
+    # 5. Error handling mechanism
+    except APIConnectionError as e:
+        return f"Error: Connection Error: Could not connect to the API. Please check your network connection and the API address. Details: {e.__cause__}"
+    except RateLimitError as e:
+        return f"Error: Rate Limit Error: You are sending requests too quickly. Please try again later. Status code: {e.status_code}"
+    except APIError as e:
+        return f"Error: API Error: The API returned a non-200 status code. Please check if your API Key or model name is correct. Status code: {e.status_code}, Details: {e.response.text}"
+    except Exception as e:
+        # Catch all other unexpected errors and print details using traceback
+        return f"Error: An unknown error occurred:\n{traceback.format_exc()}"
 
 # rprint
 _console = rich_console(force_terminal=(False if os.getenv("NO_FORCE_TERMINAL", False) else True))
