@@ -148,6 +148,11 @@ class MultiStepAgent(KwargsInitializable):
         ret = {"__main__": self.model.get_call_stat(clear=clear)}
         for agent in self.sub_agents:
             ret[agent.name] = agent.get_call_stat(clear=clear)
+        # add self.assigner_model stats
+        if self.assigner_model:
+            ret["__assigner__"] = self.assigner_model.get_call_stat(clear=clear)
+        print(f"[log]: Agent {self.name} call stats: {ret}")
+        
         full_cc = Counter(ret["__main__"].copy())
         for kk, vv in ret.items():
             if isinstance(vv, dict) and "__ALL__" in vv:
@@ -229,13 +234,14 @@ class MultiStepAgent(KwargsInitializable):
         _current_step = session.get_current_step()
         
         # Select model for this step using assigner
-        selected_model = self.select_model_for_step(session, state)
+        selected_model,selected_model_name = self.select_model_for_step(session, state)
         
         # planning
         has_plan_template = "plan" in self.templates
         if has_plan_template:  # planning to update state
             plan_messages = self.templates["plan"].format(**_input_kwargs)
             plan_response, plan_stats = self.step_call(messages=plan_messages, session=session, model=selected_model)
+            plan_stats["model_used"] = selected_model_name  # record the model used for the plan step
             plan_res = self._parse_output(plan_response)
             # state update
             if plan_res["code"]:
@@ -302,10 +308,11 @@ class MultiStepAgent(KwargsInitializable):
             _input_kwargs["stop_reason"] = stop_reason
             
             # Select model for this step using assigner
-            selected_model = self.select_model_for_step(session, state)
+            selected_model,selected_model_name = self.select_model_for_step(session, state)
             
             end_messages = self.templates["end"].format(**_input_kwargs)
             end_response, end_stats = self.step_call(messages=end_messages, session=session, model=selected_model)
+            end_stats["model_used"] = selected_model_name  # record the model used for the end step
             end_res = self._parse_output(end_response)
             if self.store_io:  # further storage
                 end_res.update({"llm_input": end_messages, "llm_output": end_response})
@@ -402,14 +409,15 @@ class MultiStepAgent(KwargsInitializable):
         assigner_template = get_template("assigner_model_selection")
         assigner_messages = assigner_template.format(**_input_kwargs)
         
-        # Call assigner model
+        # Call assigner model using self.assigner_model to track token usage
         rprint(f"Model Assigner Input:\n{assigner_messages}", style="white on magenta")
-        system_prompt = "You are an expert at selecting the most appropriate language model for a given task. Your goal is to balance cost and capability."
-
-        assigner_response = chat_with_llm(system_prompt=system_prompt,
-                                              user_prompt=assigner_messages,
-                                              model="claude-sonnet-4-20250514", 
-                                              )
+        messages = [
+            {"role": "system", "content": "You are an expert at selecting the most appropriate language model for a given task. Your goal is to balance cost and capability."},
+            {"role": "user", "content": assigner_messages}
+        ]
+        
+        assigner_response = self.assigner_model(messages)
+        
         # Parse response to get model name
         selected_model_name = assigner_response.strip()
         
@@ -419,10 +427,10 @@ class MultiStepAgent(KwargsInitializable):
             if model_info["name"] == selected_model_name:
                 # Create new LLM instance with selected model
                 selected_model = LLM(_default_init=True, call_target=selected_model_name)
-                return selected_model
+                return selected_model, selected_model_name
         
         # If model not found, return default model
-        return self.model
+        return self.model, self.model.call_target
     
     # --
 
