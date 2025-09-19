@@ -1,0 +1,46 @@
+.
+├── agent.py
+├── bc_search_tool.py
+├── bc
+│   ├── BrowseCompPlus_paper.pdf
+│   ├── run.sh
+│   ├── search_agent
+│   │   ├── anthropic_client.py
+│   │   ├── gemini_client.py
+│   │   ├── __init__.py
+│   │   ├── openai_client_myinfo.py
+│   │   ├── openai_client.py
+│   │   ├── openai_client_with_mcp.py
+│   │   ├── oss_client.py
+│   │   ├── prompts.py
+│   │   ├── __pycache__
+│   │   │   ├── prompts.cpython-310.pyc
+│   │   │   └── utils.cpython-310.pyc
+│   │   ├── qwen_client.py
+│   │   ├── search_r1_client.py
+│   │   └── utils.py
+│   ├── searcher
+│   │   ├── __init__.py
+│   │   ├── mcp_server.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   └── tools.cpython-312.pyc
+│   │   ├── searchers
+│   │   │   ├── base.py
+│   │   │   ├── bm25_searcher.py
+│   │   │   ├── custom_searcher.py
+│   │   │   ├── faiss_searcher.py
+│   │   │   ├── __init__.py
+│   │   │   └── __pycache__
+│   │   ├── search_r1_server.py
+│   │   └── tools.py
+│   ├── tool.cpython-312.pyc
+│   ├── utils.cpython-310.pyc
+│   └── utils.cpython-312.pyc
+├── session.py
+├── tool.py
+├── tree.txt
+└── utils.py
+
+20 directories, 100 files

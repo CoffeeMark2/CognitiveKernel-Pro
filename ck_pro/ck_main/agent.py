@@ -33,8 +33,8 @@ class CKAgent(MultiStepAgent):
             name="ck_agent",
             description="Cognitive Kernel, an initial autopilot system.",
             templates={"plan": "ck_plan", "action": "ck_action", "end": "ck_end", "aggr": "ck_aggr"},  # template names (no need of END here since we do NOT use __call__ for this)
-            active_functions=["web_agent", "file_agent", "stop", "ask_llm", "simple_web_search"],  # enable the useful modules
-            sub_agent_names=["web_agent", "file_agent"],  # note: another tricky point, use name rather than the objects themselves
+            active_functions=["file_agent", "stop", "ask_llm", "simple_web_search"],  # enable the useful modules (web_agent disabled)
+            sub_agent_names=["file_agent"],  # note: another tricky point, use name rather than the objects themselves (web_agent removed)
             tools=[StopTool(agent=self), self.tool_ask_llm, self.tool_simple_search],  # add related tools
             max_steps=16,  # still give it more steps
             max_time_limit=4200,  # 70 minutes

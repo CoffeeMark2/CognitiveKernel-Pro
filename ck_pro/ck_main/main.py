@@ -19,6 +19,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import functools
 
+
+
 default_main_configs = {
     "model": {"call_target": "gpt:claude-sonnet-4-20250514"},  # LLM target
     "web_agent": {

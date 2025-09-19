@@ -486,12 +486,63 @@ class MultiStepAgent(KwargsInitializable):
         return _input_kwargs, _extra_kwargs
 
     def step_action(self, action_res, action_input_kwargs, **kwargs):
+        # Collect token stats from sub-agents before execution
+        sub_agent_stats_before = {}
+        if any((z in action_res["code"]) for z in self.sub_agent_names):
+            for agent_name in self.sub_agent_names:
+                if agent_name in self.ACTIVE_FUNCTIONS:
+                    agent = self.ACTIVE_FUNCTIONS[agent_name]
+                    if hasattr(agent, 'get_call_stat'):
+                        sub_agent_stats_before[agent_name] = agent.get_call_stat(clear=False)
+
         python_executor = CodeExecutor()
         python_executor.add_global_vars(**self.ACTIVE_FUNCTIONS)  # to avoid that things might get re-defined at some place ...
         _exec_timeout = self.exec_timeout_with_call if any((z in action_res["code"]) for z in self.sub_agent_names) else self.exec_timeout_wo_call  # choose timeout value
         python_executor.run(action_res["code"], catch_exception=True, timeout=_exec_timeout)  # handle err inside!
         ret = python_executor.get_print_results()  # currently return a list of printed results
         rprint(f"Obtain action res = {ret}", style="white on yellow")
+
+        # Collect token stats from sub-agents after execution
+        sub_agent_stats_after = {}
+        sub_agent_token_usage = {}
+        if any((z in action_res["code"]) for z in self.sub_agent_names):
+            for agent_name in self.sub_agent_names:
+                if agent_name in self.ACTIVE_FUNCTIONS:
+                    agent = self.ACTIVE_FUNCTIONS[agent_name]
+                    if hasattr(agent, 'get_call_stat'):
+                        sub_agent_stats_after[agent_name] = agent.get_call_stat(clear=False)
+                        # Calculate token usage for this agent
+                        if agent_name in sub_agent_stats_before:
+                            before_stats = sub_agent_stats_before[agent_name]
+                            after_stats = sub_agent_stats_after[agent_name]
+                            token_usage = {}
+                            for key in ['llm_call', 'completion_tokens', 'prompt_tokens', 'total_tokens']:
+                                after_value = 0
+                                before_value = 0
+                                # Get the value from __ALL__ if it exists
+                                if isinstance(after_stats, dict) and "__ALL__" in after_stats:
+                                    after_value = after_stats["__ALL__"].get(key, 0)
+                                elif isinstance(after_stats, dict):
+                                    after_value = after_stats.get(key, 0)
+
+                                if isinstance(before_stats, dict) and "__ALL__" in before_stats:
+                                    before_value = before_stats["__ALL__"].get(key, 0)
+                                elif isinstance(before_stats, dict):
+                                    before_value = before_stats.get(key, 0)
+
+                                token_usage[key] = after_value - before_value
+                            sub_agent_token_usage[agent_name] = token_usage
+
+        # Store the sub-agent token usage in the action result
+        if hasattr(ret, '__dict__'):
+            ret.sub_agent_token_usage = sub_agent_token_usage
+        elif isinstance(ret, dict):
+            ret['sub_agent_token_usage'] = sub_agent_token_usage
+        elif isinstance(ret, str):
+            # For string results, we can't directly attach the stats
+            # We'll need to handle this in the calling code
+            pass
+
         return ret  # return a result str
 
     def step_check_end(self, session):
