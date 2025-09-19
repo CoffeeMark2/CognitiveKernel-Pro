@@ -8,6 +8,7 @@ import time
 import multiprocessing as mp
 import signal
 import threading
+import traceback
 
 from ..agents.utils import rprint, my_open_with, zwarn, incr_update_dict, get_until_hit, my_json_dumps, tuple_keys_to_str
 from ..agents.evaluator import Evaluator
@@ -178,6 +179,7 @@ def process_task(inst, ck_agent, ck_evaluator, args, input_dir):
         return inst
 
     except Exception as e:
+        traceback.print_exc()
         zwarn(f"Task {inst.get('id', 'N/A')} failed with a critical error: {e}")
         inst["session"] = {"error": str(e)}
         inst["eval"] = {"pred": "critical_error", "gold": str(inst.get("answer", "UNK")), "corr": 0}
@@ -248,7 +250,7 @@ def main():
     
     # 现在以追加模式继续
     with my_open_with(args.output, 'a') as fout:
-        CONCURRENCY = 10
+        CONCURRENCY = 16
         with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
             func = functools.partial(process_task, ck_agent=ck_agent, ck_evaluator=ck_evaluator, args=args, input_dir=input_dir)
             futures = {executor.submit(func, inst): inst['id'] for inst in tasks_to_run}

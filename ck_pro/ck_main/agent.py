@@ -7,7 +7,8 @@ from functools import partial
 import multiprocessing as mp
 
 from ..agents.agent import MultiStepAgent, register_template, AgentResult
-from ..agents.tool import StopTool, AskLLMTool, SimpleSearchTool
+from ..agents.tool import StopTool, AskLLMTool
+from ..agents.bc_search_tool import BCSearchTool
 from ..agents.utils import zwarn, GET_ENV_VAR
 from ..ck_web.agent import WebAgent
 try:
@@ -28,7 +29,7 @@ class CKAgent(MultiStepAgent):
             self.web_agent = WebAgent()  # sub-agent for web
         self.file_agent = FileAgent()
         self.tool_ask_llm = AskLLMTool()
-        self.tool_simple_search = SimpleSearchTool()
+        self.tool_simple_search = BCSearchTool()
         feed_kwargs = dict(
             name="ck_agent",
             description="Cognitive Kernel, an initial autopilot system.",
