@@ -27,8 +27,8 @@ _CK_STRATEGY = """
         - **Explicitly Specify Requirements**: Sub-agents operate independently and do not share context or access external information. Always include all necessary details, instructions, and desired output formats in your queries to each sub-agent.
         - **Define Output Formats**: Clearly state the required output format when requesting information to ensure consistency and facilitate downstream processing.
     - **Typical Workflows**:
-        - Example 1, Analyzing a File from the Web: (1) Use `simple_web_search` to find the file’s URL (this step can be optional but might usually be helpful to quickly identify the information source). (2) Use `web_agent` to download the file using the obtained URL (note that web_agent usually cannot access local files). (3) Use `file_agent` to process the downloaded file.
-        - Example 2, Finding Related Information for a Keyword in a Local File: (1) Use `file_agent` to analyze the file and locate the keyword. (2) Use `simple_web_search` to search for related information. (3) Use `web_agent` to gather more detailed information as needed.
+        - Example 1, Finding and Summarizing Web Content: (1) Use `simple_web_search` to find initial information and identify key sources or entities. (2) Use `simple_web_search` again with a more specific query (e.g., focusing on a specific source found in step 1) to gather detailed text-based information. (3) Synthesize the final answer from the collected search results.
+        - Example 2, Finding Related Information for a Keyword in a Local File: (1) Use `file_agent` to analyze the file and locate the keyword. (2) Use `simple_web_search` to search for related information online based on the keyword and its context from the file.
         - Complex Tasks: For more complex scenarios, you may need to interleave calls to different sub-agents and tools. Always specify a clear, step-by-step plan.
     - **Important Notes**:
         - Each sub-agent call is independent; once a call returns, its state is discarded.
@@ -53,7 +53,7 @@ The progress state is crucial for tracking the task's advancement and includes:
 Here is an example progress state for a task to locate and download a specific paper for analysis:
 ```python
 {
-    "completed_list": ["Located and downloaded the paper (as 'paper.pdf') using the web agent.", "Analyze the paper with the document agent."],  # completed steps
+    "completed_list": ["Located and downloaded the paper (as 'paper.pdf') using the simple_web_search.", "Analyze the paper with the document agent."],  # completed steps
     "todo_list": ["Perform web search with the key words identified from the paper."],  # todo list
     "experience": [],  # record special notes and tips
     "information": ["The required key words from the paper are AI and NLP."],  # previous important information
@@ -90,7 +90,7 @@ _CK_ACTION_SYS = """You are a strategic assistant responsible for the action mod
 Summarize a random paper about LLM research from the Web
 
 ### Step 1
-Thought: Begin by searching the web for recent research papers related to large language models (LLMs).
+Thought: Begin by searching the web for recent research papers related to large language models (LLMs) to get an overview.
 Code:
 ```python
 search_query = "latest research paper on large language models"
@@ -98,19 +98,20 @@ result = simple_web_search(search_query)
 print(result)
 ```
 
-### Step 2
-Thought: From the search results, choose a random relevant paper. Use web_agent to download the PDF version of the selected paper.
+Step 2
+
+Thought: The initial search results mention a paper called "Large Language Models: A Survey". I will perform a new, more specific search to find a summary or abstract of this particular paper.
 Code:
 ```python
-print(web_agent(task="Download the PDF of the arXiv paper 'Large Language Models: A Survey' and save it as './LLM_paper.pdf'"))
+print(simple_web_search(query="summary of research paper 'Large Language Models: A Survey'"))
 ```
 
-### Step 3
-Thought: With the paper downloaded, use file_agent to generate a summary of its contents.
+Step 3
+
+Thought: The information gathered from the search results is sufficient to form a summary. I will now use the stop function to output the final answer.
 Code:
 ```python
-result=file_agent(task="Summarize the paper", file_path_dict={"./LLM_paper.pdf": "Large Language Models: A Survey"})
-print(result)
+stop("The paper 'Large Language Models: A Survey' provides a comprehensive overview of the field, covering topics such as model architectures, training techniques, and downstream applications. It is a foundational text for researchers entering the field of LLMs.")
 ```
 
 ### Note
@@ -146,7 +147,7 @@ Code:
 ```python
 {
     "output": "799",  # provide a well-formatted output
-    "log": "The task is completed. The result is found by first using the web_agent to obtain the information and then using Python for calculation.",  # a summary of the navigation details
+    "log": "The task is completed. The result is found by first using the simple_web_search to obtain the information and then using Python for calculation.",  # a summary of the navigation details
 }
 ```
 

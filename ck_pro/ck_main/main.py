@@ -23,10 +23,10 @@ import functools
 
 default_main_configs = {
     "model": {"call_target": "gpt:claude-sonnet-4-20250514"},  # LLM target
-    "web_agent": {
-        "model": {"call_target": "gpt:claude-sonnet-4-20250514"},  # LLM target for the web agent
-        "web_env_kwargs": {"web_ip": "localhost:3000"},  # IP for the web-browser server
-    }
+    # "web_agent": {
+    #     "model": {"call_target": "gpt:claude-sonnet-4-20250514"},  # LLM target for the web agent
+    #     "web_env_kwargs": {"web_ip": "localhost:3000"},  # IP for the web-browser server
+    # }
 }
 
 def get_args():
